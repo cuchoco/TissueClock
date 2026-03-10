@@ -35,8 +35,7 @@ def test_tissue_mambamil():
         dim=dim,
         layer=2,
         rate=10,
-        tissue_embed=True,
-        tissue_embed_dim=16
+        tissue_embed=True
     )
     
     print(model)
