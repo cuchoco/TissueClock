@@ -46,8 +46,6 @@ class TissueTransMIL(nn.Module):
         self.tissue_embed = tissue_embed
         if tissue_embed:
             # We treat the tissue embedding as a special token, so it must match 'dim'
-            # To support any 'tissue_embed_dim' config, we can use a linear projection 
-            # if we wanted, but making the embedding directly 'dim' size is most efficient.
             self.tissue_embedding = nn.Embedding(num_embeddings=num_tissues, embedding_dim=dim)
             num_extra_tokens = 2 # CLS token + Tissue token
         else:

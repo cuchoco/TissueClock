@@ -11,8 +11,7 @@ cfg_dict = {
     'model_params': {
         'in_dim': 1536,
         'dim': 512,
-        'tissue_embed': True,
-        'tissue_embed_dim': 16
+        'tissue_embed': True
     },
     'num_tissues': 40,
     'use_wandb': False,

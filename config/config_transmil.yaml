@@ -23,7 +23,6 @@ model_params:
   in_dim: 1536
   dim: 512
   tissue_embed: false
-  tissue_embed_dim: 16
   
 hydra:
   run:
