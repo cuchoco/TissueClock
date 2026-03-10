@@ -107,7 +107,6 @@ class TissueMambaMIL(nn.Module):
             self.num_extra_tokens = 1 # CLS
             
         self._fc1 = nn.Sequential(nn.Linear(in_dim, dim), nn.ReLU())
-        self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         
         self.layers = nn.ModuleList()
         for _ in range(layer):
@@ -140,14 +139,10 @@ class TissueMambaMIL(nn.Module):
         
         h = self._fc1(h) # [B, N, dim]
         
-        # Optional: CLS token & tissue token logic (though MambaMIL uses Attention pooling at the end)
-        # We'll include them to preserve spatial/tissue context if desired
-        cls_tokens = self.cls_token.expand(B, -1, -1).to(h.device)
+        # Optional: Append Tissue Token if provided
         if self.tissue_embed and tissue_id is not None:
             tissue_tokens = self.tissue_embedding(tissue_id).unsqueeze(1) # [B, 1, dim]
-            h = torch.cat((cls_tokens, tissue_tokens, h), dim=1)
-        else:
-            h = torch.cat((cls_tokens, h), dim=1)
+            h = torch.cat((tissue_tokens, h), dim=1)
 
         # SR-Mamba Layers
         for layer in self.layers:

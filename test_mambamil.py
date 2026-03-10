@@ -50,10 +50,10 @@ def test_tissue_mambamil():
         y_pred, head_attentions = model(features, tissue_id=tissue_ids)
         print(f"\nForward Pass Successful!")
         print(f"Y_pred Shape: {y_pred.shape} (Expected: ({batch_size},))")
-        print(f"Head Attentions Shape: {head_attentions.shape} (Expected: ({batch_size}, {num_patches + 2}))") # +2 for CLS and Tissue Token
+        print(f"Head Attentions Shape: {head_attentions.shape} (Expected: ({batch_size}, {num_patches + 1}))") # +1 for Tissue Token
         
         assert y_pred.shape == (batch_size,), "y_pred shape mismatch!"
-        assert head_attentions.shape == (batch_size, num_patches + 2), "head_attentions shape mismatch!"
+        assert head_attentions.shape == (batch_size, num_patches + 1), "head_attentions shape mismatch!"
         print("TissueMambaMIL Test Passed!\n")
         
     except Exception as e:
