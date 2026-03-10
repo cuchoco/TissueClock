@@ -1,0 +1,14 @@
+model: pan             
+data_dir: /data0/age_predict/preprocessed/tissue_datasets
+fold: 0
+output_dir: ./experiments/ridge_models_pan_label
+use_tissue_label: true
+
+model_params: {}
+  
+hydra:
+  run:
+    dir: experiments/log/runs/${now:%Y-%m-%d}_${now:%H-%M-%S}
+  sweep:
+    dir: experiments/log/multiruns/${now:%Y-%m-%d}_${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
