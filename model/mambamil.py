@@ -94,17 +94,13 @@ class TissueMambaMIL(nn.Module):
     MambaMIL adapted for Age Prediction (Regression) and optional Tissue Embedding.
     """
     def __init__(self, num_tissues, in_dim=1536, dim=512, layer=2, rate=10, 
-                 tissue_embed=False, tissue_embed_dim=16, 
-                 d_state=16, d_conv=4, expand=2):
+                 tissue_embed=False, d_state=16, d_conv=4, expand=2):
         super(TissueMambaMIL, self).__init__()
         self.tissue_embed = tissue_embed
         self.rate = rate
         
         if tissue_embed:
             self.tissue_embedding = nn.Embedding(num_embeddings=num_tissues, embedding_dim=dim)
-            self.num_extra_tokens = 2 # CLS + Tissue
-        else:
-            self.num_extra_tokens = 1 # CLS
             
         self._fc1 = nn.Sequential(nn.Linear(in_dim, dim), nn.ReLU())
         
