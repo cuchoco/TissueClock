@@ -54,6 +54,12 @@ class TransMILTrainer:
         self.dim = model_params.get('dim', 512)
         self.tissue_embed = model_params.get('tissue_embed', False)
         self.tissue_embed_dim = model_params.get('tissue_embed_dim', 16)
+        self.nystrom_dim_head = model_params.get('nystrom_dim_head', self.dim // 8)
+        self.nystrom_heads = model_params.get('nystrom_heads', 8)
+        self.nystrom_num_landmarks = model_params.get('nystrom_num_landmarks', self.dim // 2)
+        self.nystrom_pinv_iterations = model_params.get('nystrom_pinv_iterations', 6)
+        self.nystrom_residual = model_params.get('nystrom_residual', True)
+        self.ppeg_kernel_sizes = model_params.get('ppeg_kernel_sizes', [7, 5, 3])
         
         # W&B configuration
         self.use_wandb = cfg.get('use_wandb', True)
@@ -110,7 +116,13 @@ class TransMILTrainer:
             in_dim=self.in_dim,
             dim=self.dim,
             tissue_embed=self.tissue_embed,
-            tissue_embed_dim=self.tissue_embed_dim if self.tissue_embed else 0
+            tissue_embed_dim=self.tissue_embed_dim if self.tissue_embed else 0,
+            nystrom_dim_head=self.nystrom_dim_head,
+            nystrom_heads=self.nystrom_heads,
+            nystrom_num_landmarks=self.nystrom_num_landmarks,
+            nystrom_pinv_iterations=self.nystrom_pinv_iterations,
+            nystrom_residual=self.nystrom_residual,
+            ppeg_kernel_sizes=self.ppeg_kernel_sizes
         )
     
     def train_epoch(self, train_loader) -> float:

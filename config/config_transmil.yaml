@@ -23,6 +23,12 @@ model_params:
   in_dim: 1536
   dim: 512
   tissue_embed: false
+  nystrom_dim_head: 64
+  nystrom_heads: 8
+  nystrom_num_landmarks: 256
+  nystrom_pinv_iterations: 6
+  nystrom_residual: true
+  ppeg_kernel_sizes: [7, 5, 3]
   
 hydra:
   run:
