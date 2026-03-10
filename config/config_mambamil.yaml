@@ -1,0 +1,37 @@
+model: mambamil             
+data_dir: /data0/age_predict/preprocessed/coords/features_uni_v2
+fold: 0
+output_dir: ./experiments/mambamil_models
+
+# Training parameters
+batch_size: 1
+num_epochs: 100
+learning_rate: 1e-4
+weight_decay: 1e-5
+accumulation_steps: 4
+num_tissues: 40
+seed: 42
+
+# W&B configuration
+use_wandb: true
+wandb_project: age-predict-mambamil
+wandb_entity: null 
+log_step: 100
+
+# Model parameters
+model_params:
+  in_dim: 1536
+  dim: 512
+  tissue_embed: true
+  layer: 2
+  rate: 10
+  d_state: 16
+  d_conv: 4
+  expand: 2
+  
+hydra:
+  run:
+    dir: experiments/log/runs/${now:%Y-%m-%d}_${now:%H-%M-%S}
+  sweep:
+    dir: experiments/log/multiruns/${now:%Y-%m-%d}_${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
