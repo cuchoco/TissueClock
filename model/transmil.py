@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.nn.init as init
 import numpy as np
 from nystrom_attention import NystromAttention
 
@@ -70,6 +71,9 @@ class TissueTransMIL(nn.Module):
         # Regressor layer for Age Prediction
         self._fc2 = nn.Linear(dim, 1)
 
+        self.apply(self._init_weights)
+        init.trunc_normal_(self.cls_token, std=0.02)
+
     def forward(self, features, attn_mask=None, tissue_id=None):
         """
         features shape: (batch_size, num_images(patches), in_dim)
@@ -114,3 +118,14 @@ class TissueTransMIL(nn.Module):
         head_attentions = None
         
         return Y_pred, head_attentions
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            init.trunc_normal_(m.weight, std=0.02)
+            if m.bias is not None:
+                init.constant_(m.bias, 0)
+        elif isinstance(m, nn.LayerNorm):
+            init.constant_(m.bias, 0)
+            init.constant_(m.weight, 1.0)
+        elif isinstance(m, nn.Embedding):
+            init.trunc_normal_(m.weight, std=0.02)
