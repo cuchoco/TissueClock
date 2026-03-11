@@ -5,7 +5,7 @@ output_dir: ./experiments/transmil_models
 
 # Training parameters
 batch_size: 1
-num_epochs: 100
+num_epochs: 20
 learning_rate: 1e-4
 weight_decay: 1e-5
 accumulation_steps: 4
@@ -13,7 +13,7 @@ num_tissues: 40
 
 # W&B configuration
 use_wandb: true
-wandb_project: age-predict-transmil
+wandb_project: age-predict
 wandb_entity: null 
 log_step: 100
 

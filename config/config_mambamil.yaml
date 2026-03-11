@@ -14,7 +14,7 @@ seed: 42
 
 # W&B configuration
 use_wandb: true
-wandb_project: age-predict-mambamil
+wandb_project: age-predict
 wandb_entity: null 
 log_step: 100
 

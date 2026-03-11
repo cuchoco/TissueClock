@@ -29,10 +29,7 @@ class TransMILTrainer:
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        
-        # Initialize Accelerator
-        self.accelerator = Accelerator()
-        
+                
         # Create output directory
         self.output_dir = Path(cfg.output_dir) / f"tissue_transmil_fold{cfg.fold}"
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -63,7 +60,7 @@ class TransMILTrainer:
         
         # W&B configuration
         self.use_wandb = cfg.get('use_wandb', True)
-        self.wandb_project = cfg.get('wandb_project', 'age-predict-transmil')
+        self.wandb_project = cfg.get('wandb_project', 'age-predict')
         self.wandb_entity = cfg.get('wandb_entity', None)
         self.wandb_run = None
         self.log_step = cfg.get('log_step', 100)
@@ -82,7 +79,9 @@ class TransMILTrainer:
             'val_r2': [],
             'best_val_idx': 0
         }
-        
+        # Initialize Accelerator
+        self.accelerator = Accelerator(gradient_accumulation_steps=self.accumulation_steps)        
+
         # Initialize W&B
         if self.use_wandb and self.accelerator.is_main_process:
             self._init_wandb()
@@ -94,7 +93,7 @@ class TransMILTrainer:
                 project=self.wandb_project,
                 entity=self.wandb_entity,
                 config=dict(self.cfg),
-                name=f"transmil_fold{self.fold}_{self.cfg.model}",
+                name=f"{self.cfg.model}_fold{self.fold}_label_{self.tissue_embed}",
                 dir=str(self.output_dir),
                 reinit=False
             )
@@ -154,15 +153,10 @@ class TransMILTrainer:
                 
                 # Backward pass
                 self.accelerator.backward(loss)
-                
-                # Optimizer and Scheduler step (Accumulation step or last batch)
-                is_accumulating = (batch_idx + 1) % self.accumulation_steps == 0
-                is_last_batch = (batch_idx + 1) == len(train_loader)
-                
-                if is_accumulating or is_last_batch:
-                    self.optimizer.step()
-                    self.scheduler.step()  
-                    self.optimizer.zero_grad()
+                # Optimizer and Scheduler step
+                self.optimizer.step()
+                self.scheduler.step()  
+                self.optimizer.zero_grad()
             
             total_loss += loss.item()
             progress_bar.set_postfix({'loss': loss.item()})
