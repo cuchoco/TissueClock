@@ -23,7 +23,7 @@ model_params:
   in_dim: 1536
   latent_seq: 64
   latent_dim: 512
-  tissue_embed: false
+  tissue_embed: true
   perceiver_depth: 4
   transformer_depth: 2
   xattn_heads: 8
