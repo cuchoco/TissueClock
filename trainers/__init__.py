@@ -3,6 +3,7 @@ from .tissue import train as train_tissue
 from .abmil import train as train_abmil
 from .transmil import train as train_transmil
 from .mambamil import train as train_mambamil
+from .perceiver import train as train_perceiver
 
 TRAINERS = {
     'pan': train_pan,
@@ -10,4 +11,5 @@ TRAINERS = {
     'abmil': train_abmil,
     'transmil': train_transmil,
     'mambamil': train_mambamil,
+    'perceiver': train_perceiver,
 }
