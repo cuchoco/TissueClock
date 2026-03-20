@@ -123,7 +123,13 @@ class TissueMambaMIL(nn.Module):
         )
         
         # Regressor layer for Age Prediction
-        self._fc2 = nn.Linear(dim, 1)
+        self.regressor = nn.Sequential(
+            nn.Linear(dim, 256),
+            nn.LayerNorm(256),
+            nn.GELU(),
+            nn.Dropout(0.25),
+            nn.Linear(256, 1)
+        )
 
     def forward(self, features, attn_mask=None, tissue_id=None):
         """
@@ -159,7 +165,7 @@ class TissueMambaMIL(nn.Module):
         h_agg = torch.bmm(A, h).squeeze(1) # [B, dim]
         
         # Predict Age
-        Y_pred = self._fc2(h_agg).squeeze(-1) # [B]
+        Y_pred = self.regressor(h_agg).squeeze(-1) # [B]
         
         head_attentions = A.squeeze(1) # [B, n]
         

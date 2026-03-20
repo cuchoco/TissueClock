@@ -303,7 +303,13 @@ class TissuePerceiverMIL(nn.Module):
         self.cls_norm = nn.LayerNorm(latent_dim)
 
         # Regression head
-        self._fc2 = nn.Linear(latent_dim, 1)
+        self.regressor = nn.Sequential(
+            nn.Linear(latent_dim, 256),
+            nn.LayerNorm(256),
+            nn.GELU(),
+            nn.Dropout(0.25),
+            nn.Linear(256, 1)
+        )
 
         self.apply(self._init_weights)
 
@@ -345,7 +351,7 @@ class TissuePerceiverMIL(nn.Module):
         cls_emb = self.cls_norm(cls_emb)
 
         # Predict age
-        Y_pred = self._fc2(cls_emb).squeeze(-1)  # [B]
+        Y_pred = self.regressor(cls_emb).squeeze(-1)  # [B]
 
         head_attentions = None
 
