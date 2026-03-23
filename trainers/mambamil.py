@@ -50,7 +50,6 @@ class MambaMILTrainer:
         self.in_dim = model_params.get('in_dim', 1536)
         self.dim = model_params.get('dim', 512)
         self.tissue_embed = model_params.get('tissue_embed', False)
-        self.tissue_embed_dim = model_params.get('tissue_embed_dim', 16)
         self.layer = model_params.get('layer', 2)
         self.rate = model_params.get('rate', 10)
         self.d_state = model_params.get('d_state', 16)
@@ -114,7 +113,6 @@ class MambaMILTrainer:
             layer=self.layer,
             rate=self.rate,
             tissue_embed=self.tissue_embed,
-            tissue_embed_dim=self.tissue_embed_dim if self.tissue_embed else 0,
             d_state=self.d_state,
             d_conv=self.d_conv,
             expand=self.expand
@@ -246,8 +244,12 @@ class MambaMILTrainer:
         self.accelerator.print("=" * 80)
         
         self._build_model()
-        
-        train_loader, val_loader = get_abmil_dataloader(fold=self.fold, batch_size=self.batch_size)
+        if self.cfg.get('use_normal_data', False):
+            from dataset.data_normal import get_abmil_dataloader as get_abmil_dataloader_normal
+            self.accelerator.print("Using Normal Data ONLY!")
+            train_loader, val_loader = get_abmil_dataloader_normal(fold=self.fold, batch_size=self.batch_size)
+        else:
+            train_loader, val_loader = get_abmil_dataloader(fold=self.fold, batch_size=self.batch_size)
         
         self.optimizer = AdamW(
             self.model.parameters(),

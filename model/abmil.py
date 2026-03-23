@@ -126,6 +126,8 @@ class TissueABMIL(nn.Module):
             nn.Dropout(0.25),
             nn.Linear(256, 1)
         )
+        # self.regressor = nn.Linear(combined_dim, 1)
+
 
     def forward(self, features, attn_mask=None, tissue_id=None):
         """

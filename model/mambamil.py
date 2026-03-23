@@ -123,13 +123,7 @@ class TissueMambaMIL(nn.Module):
         )
         
         # Regressor layer for Age Prediction
-        self.regressor = nn.Sequential(
-            nn.Linear(dim, 256),
-            nn.LayerNorm(256),
-            nn.GELU(),
-            nn.Dropout(0.25),
-            nn.Linear(256, 1)
-        )
+        self.regressor = nn.Linear(dim, 1)
 
     def forward(self, features, attn_mask=None, tissue_id=None):
         """

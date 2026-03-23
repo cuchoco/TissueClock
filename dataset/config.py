@@ -1,4 +1,5 @@
 CSV_PATH = '/home/kuchoco97/work/2026_01_age_predict/csv/final_data.csv'
+CSV_PATH_NORMAL = '/home/kuchoco97/work/2026_01_age_predict/csv/final_normal.csv'
 FEATURE_ROOT = '/data0/age_predict/preprocessed/coords/features_uni_v2'
 
 # caculated from GTEx data

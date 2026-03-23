@@ -5,7 +5,7 @@ output_dir: ./experiments/abmil_models_wlabel
 
 # Training parameters
 batch_size: 4
-num_epochs: 100
+num_epochs: 20
 learning_rate: 1e-4
 weight_decay: 1e-5
 accumulation_steps: 1
@@ -32,3 +32,6 @@ hydra:
   sweep:
     dir: experiments/log/multiruns/${now:%Y-%m-%d}_${now:%H-%M-%S}
     subdir: ${hydra.job.num}
+
+# Dataset toggle
+use_normal_data: false

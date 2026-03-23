@@ -302,14 +302,16 @@ class TissuePerceiverMIL(nn.Module):
 
         self.cls_norm = nn.LayerNorm(latent_dim)
 
-        # Regression head
-        self.regressor = nn.Sequential(
-            nn.Linear(latent_dim, 256),
-            nn.LayerNorm(256),
-            nn.GELU(),
-            nn.Dropout(0.25),
-            nn.Linear(256, 1)
+        # Attention-based pooling
+        self.attention = nn.Sequential(
+            nn.Linear(latent_dim, 128),
+            nn.Tanh(),
+            nn.Linear(128, 1)
         )
+
+        # Regression head
+        self.regressor = nn.Linear(latent_dim, 1)
+            
 
         self.apply(self._init_weights)
 
@@ -346,14 +348,20 @@ class TissuePerceiverMIL(nn.Module):
         # Perceiver: cross-attend latent queries to patch embeddings
         x = self.perceiver(context=h, attn_mask=attn_mask)  # [B, latent_seq+1, latent_dim]
 
-        # Use first latent as CLS embedding
-        cls_emb = x[:, 0]  # [B, latent_dim]
-        cls_emb = self.cls_norm(cls_emb)
+        x = self.cls_norm(x)
+
+        # Attention Pooling (ABMIL style)
+        A = self.attention(x)  # [B, latent_seq+1, 1]
+        A = torch.transpose(A, 1, 2)  # [B, 1, latent_seq+1]
+        A = F.softmax(A, dim=-1)
+
+        # Aggregated representation
+        h_agg = torch.bmm(A, x).squeeze(1)  # [B, latent_dim]
 
         # Predict age
-        Y_pred = self.regressor(cls_emb).squeeze(-1)  # [B]
-
-        head_attentions = None
+        Y_pred = self.regressor(h_agg).squeeze(-1)  # [B]
+        
+        head_attentions = A.squeeze(1)
 
         return Y_pred, head_attentions
 

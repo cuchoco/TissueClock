@@ -278,7 +278,12 @@ class PerceiverTrainer:
         self._build_model()
         
         # Data loader (reusing ABMIL dataloader since they have same requirements)
-        train_loader, val_loader = get_abmil_dataloader(fold=self.fold, batch_size=self.batch_size)
+        if self.cfg.get('use_normal_data', False):
+            from dataset.data_normal import get_abmil_dataloader as get_abmil_dataloader_normal
+            self.accelerator.print("Using Normal Data ONLY!")
+            train_loader, val_loader = get_abmil_dataloader_normal(fold=self.fold, batch_size=self.batch_size)
+        else:
+            train_loader, val_loader = get_abmil_dataloader(fold=self.fold, batch_size=self.batch_size)
         
         # Optimizer
         self.optimizer = AdamW(
