@@ -204,9 +204,7 @@ class TissueABMIL(nn.Module):
             - 'none': No tissue conditioning
             - 'concat': Original concatenation approach (legacy)
             - 'film': FiLM conditioning on features (recommended)
-            - 'attn_bias': Tissue-conditioned attention bias
             - 'cond_regressor': Tissue-conditioned prediction head
-        tissue_embed_dim: Dimension of tissue embedding (for concat mode)
         tissue_cond_embed_dim: Dimension of tissue embedding (for new conditioning modes)
     """
     VALID_COND_MODES = ('none', 'concat', 'film', 'cond_regressor')
