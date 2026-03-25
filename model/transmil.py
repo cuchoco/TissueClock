@@ -69,14 +69,8 @@ class TissueTransMIL(nn.Module):
         self.norm = nn.LayerNorm(dim)
         
         # Regressor layer for Age Prediction
-        self.regressor = nn.Sequential(
-            nn.Linear(dim, 256),
-            nn.LayerNorm(256),
-            nn.GELU(),
-            nn.Dropout(0.25),
-            nn.Linear(256, 1)
-        )
-
+        self.regressor = nn.Linear(dim, 1),
+           
         self.apply(self._init_weights)
         init.trunc_normal_(self.cls_token, std=0.02)
 
@@ -115,8 +109,8 @@ class TissueTransMIL(nn.Module):
         #---->Translayer x2
         h = self.layer2(h) #[B, N, dim]
 
-        #---->cls_token (we use the updated CLS token for prediction)
-        h = self.norm(h)[:,0]
+        #---->mean_pooling
+        h = self.norm(h).mean(axis=1)
 
         #---->predict
         Y_pred = self.regressor(h).squeeze(-1) #[B]

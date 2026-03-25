@@ -35,7 +35,8 @@ class AgePredictDataset(Dataset):
 
         tissue_name = data['Tissue']
         tissue_name = re.sub(r'[^a-zA-Z0-9]+', '_', str(tissue_name)).strip('_')
-        tissue_id = TISSUE_TO_ID[tissue_name]
+        organ_name = SUBTYPE_TO_ORGAN[tissue_name]
+        tissue_id = ORGAN_TO_ID[organ_name]
 
         with h5py.File(file, 'r') as f:
             features = f['features'][:]

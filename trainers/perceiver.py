@@ -302,7 +302,8 @@ class PerceiverTrainer:
         
         self.scheduler = CosineAnnealingLR(
             self.optimizer,
-            T_max=total_steps
+            T_max=total_steps,
+            eta_min=1e-6
         )
         self.scheduler = self.accelerator.prepare(self.scheduler)
         

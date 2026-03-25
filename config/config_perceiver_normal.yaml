@@ -1,0 +1,44 @@
+model: perceiver             
+data_dir: /data0/age_predict/preprocessed/coords/features_uni_v2
+fold: 0
+output_dir: ./experiments/perceiver_models_normal
+
+# Training parameters
+batch_size: 4
+num_epochs: 20
+learning_rate: 1e-4
+weight_decay: 1e-5
+accumulation_steps: 1
+num_tissues: 40
+seed: 42
+
+# W&B configuration
+use_wandb: true
+wandb_project: age-predict
+wandb_entity: null 
+log_step: 100
+
+# Model parameters
+model_params:
+  in_dim: 1536
+  latent_seq: 64
+  latent_dim: 512
+  tissue_embed: false
+  perceiver_depth: 4
+  transformer_depth: 2
+  xattn_heads: 8
+  mhsa_heads: 8
+  share_xattn_start_layer: 1
+  share_tf_start_layer: 0
+  mlp_mult: 1
+  mlp_activation: geglu
+  
+hydra:
+  run:
+    dir: experiments/log/runs/${now:%Y-%m-%d}_${now:%H-%M-%S}
+  sweep:
+    dir: experiments/log/multiruns/${now:%Y-%m-%d}_${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+
+# Dataset toggle
+use_normal_data: true

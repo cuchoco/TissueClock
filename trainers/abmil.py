@@ -53,6 +53,8 @@ class ABMILTrainer:
         self.gated = model_params.get('gated', True)
         self.tissue_embed = model_params.get('tissue_embed', False)
         self.tissue_embed_dim = model_params.get('tissue_embed_dim', 16)
+        self.tissue_cond_mode = model_params.get('tissue_cond_mode', 'none')
+        self.tissue_cond_embed_dim = model_params.get('tissue_cond_embed_dim', 64)
         
         # W&B configuration
         self.use_wandb = cfg.get('use_wandb', True)
@@ -115,7 +117,9 @@ class ABMILTrainer:
             n_heads=self.n_heads,
             gated=self.gated,
             tissue_embed=self.tissue_embed,
-            tissue_embed_dim=self.tissue_embed_dim if self.tissue_embed else 0
+            tissue_embed_dim=self.tissue_embed_dim if self.tissue_embed else 0,
+            tissue_cond_mode=self.tissue_cond_mode,
+            tissue_cond_embed_dim=self.tissue_cond_embed_dim
         )
     
     def train_epoch(self, train_loader) -> float:
@@ -138,10 +142,8 @@ class ABMILTrainer:
             attn_mask = data[3]
 
             with self.accelerator.accumulate(self.model):
-                if self.tissue_embed:
-                    predictions, _ = self.model(features, attn_mask=attn_mask, tissue_id=tissue_ids)
-                else:
-                    predictions, _ = self.model(features, attn_mask=attn_mask, tissue_id=None)
+                use_tissue = self.tissue_embed or self.tissue_cond_mode != 'none'
+                predictions, _ = self.model(features, attn_mask=attn_mask, tissue_id=tissue_ids if use_tissue else None)
                 
                 loss = self.train_loss_fn(predictions, ages)
                 
@@ -187,10 +189,8 @@ class ABMILTrainer:
             tissue_ids = data[2]
             attn_mask = data[3]
             
-            if self.tissue_embed:
-                predictions, _ = self.model(features, attn_mask=attn_mask, tissue_id=tissue_ids)
-            else:
-                predictions, _ = self.model(features, attn_mask=attn_mask, tissue_id=None)
+            use_tissue = self.tissue_embed or self.tissue_cond_mode != 'none'
+            predictions, _ = self.model(features, attn_mask=attn_mask, tissue_id=tissue_ids if use_tissue else None)
             
             loss = self.train_loss_fn(predictions, ages)
             
