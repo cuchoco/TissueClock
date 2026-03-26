@@ -83,3 +83,11 @@ ORGAN_TO_ID = {
     'Uterus': 27,
     'Vagina': 28
 }
+
+SEX_TO_ID = {
+    "Male": 1,
+    "Female": 2
+}
+
+ID_TO_ORGAN = {v: k for k, v in ORGAN_TO_ID.items()}
+ID_TO_SEX = {v: k for k, v in SEX_TO_ID.items()}

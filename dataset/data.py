@@ -31,6 +31,7 @@ class AgePredictDataset(Dataset):
         sample_id = data['Tissue Sample ID']
         age = data['AGE']
         age = (age - AGE_MEAN) / AGE_STD  # Normalize age
+        sex = data['SEX'] - 1 # 0: male, 1: female
         file = self.feature_root / f'{sample_id}.h5'
 
         tissue_name = data['Tissue']
@@ -43,7 +44,8 @@ class AgePredictDataset(Dataset):
         
         return torch.tensor(features, dtype=torch.float32), \
                torch.tensor(age, dtype=torch.float32), \
-               torch.tensor(tissue_id, dtype=torch.long)
+               torch.tensor(tissue_id, dtype=torch.long), \
+               torch.tensor(sex, dtype=torch.long)
     
 def mil_collate_fn(batch: List[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
@@ -55,6 +57,7 @@ def mil_collate_fn(batch: List[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]])
     features_list = [item[0] for item in batch]
     labels = [item[1] for item in batch]
     tissue_ids = [item[2] for item in batch]
+    sexs = [item[3] for item in batch]
     
     # Features Padding
     padded_features = pad_sequence(features_list, batch_first=True, padding_value=0.0)
@@ -67,8 +70,9 @@ def mil_collate_fn(batch: List[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]])
     
     labels = torch.tensor(labels, dtype=torch.float32)
     tissue_ids = torch.tensor(tissue_ids, dtype=torch.long)
+    sexs = torch.tensor(sexs, dtype=torch.long)
     
-    return padded_features, labels, tissue_ids, attn_mask
+    return padded_features, labels, tissue_ids, attn_mask, sexs
 
 def get_abmil_dataloader(fold: int = 0, batch_size: int = 1) -> Tuple[DataLoader, DataLoader]:
     

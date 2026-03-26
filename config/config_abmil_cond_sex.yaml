@@ -1,7 +1,7 @@
 model: abmil             
 data_dir: /data0/age_predict/preprocessed/coords/features_uni_v2
 fold: 0
-output_dir: ./experiments/abmil_models_film
+output_dir: ./experiments/abmil_models_cond_sex
 
 # Training parameters
 batch_size: 4
@@ -24,7 +24,8 @@ model_params:
   n_heads: 4
   gated: true
   tissue_embed: true
-  tissue_cond_mode: film
+  sex_embed: true
+  tissue_cond_mode: cond_regressor
   tissue_cond_embed_dim: 64
   
 hydra:

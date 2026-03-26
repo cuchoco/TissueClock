@@ -52,9 +52,9 @@ class ABMILTrainer:
         self.n_heads = model_params.get('n_heads', 4)
         self.gated = model_params.get('gated', True)
         self.tissue_embed = model_params.get('tissue_embed', False)
-        self.tissue_embed_dim = model_params.get('tissue_embed_dim', 16)
-        self.tissue_cond_mode = model_params.get('tissue_cond_mode', 'none')
+        self.tissue_cond_mode = model_params.get('tissue_cond_mode', None)
         self.tissue_cond_embed_dim = model_params.get('tissue_cond_embed_dim', 64)
+        self.sex_embed = model_params.get('sex_embed', False)
         
         # W&B configuration
         self.use_wandb = cfg.get('use_wandb', True)
@@ -117,9 +117,9 @@ class ABMILTrainer:
             n_heads=self.n_heads,
             gated=self.gated,
             tissue_embed=self.tissue_embed,
-            tissue_embed_dim=self.tissue_embed_dim if self.tissue_embed else 0,
             tissue_cond_mode=self.tissue_cond_mode,
-            tissue_cond_embed_dim=self.tissue_cond_embed_dim
+            tissue_cond_embed_dim=self.tissue_cond_embed_dim,
+            sex_embed=self.sex_embed
         )
     
     def train_epoch(self, train_loader) -> float:
@@ -140,10 +140,14 @@ class ABMILTrainer:
             ages = data[1]
             tissue_ids = data[2]
             attn_mask = data[3]
+            sexs = data[4]
 
             with self.accelerator.accumulate(self.model):
                 use_tissue = self.tissue_embed or self.tissue_cond_mode != 'none'
-                predictions, _ = self.model(features, attn_mask=attn_mask, tissue_id=tissue_ids if use_tissue else None)
+                predictions, _ = self.model(features, 
+                                            attn_mask=attn_mask, 
+                                            tissue_id=tissue_ids if use_tissue else None, 
+                                            sex=sexs if use_tissue else None)
                 
                 loss = self.train_loss_fn(predictions, ages)
                 
@@ -188,9 +192,13 @@ class ABMILTrainer:
             ages = data[1]
             tissue_ids = data[2]
             attn_mask = data[3]
-            
+            sexs = data[4]
+
             use_tissue = self.tissue_embed or self.tissue_cond_mode != 'none'
-            predictions, _ = self.model(features, attn_mask=attn_mask, tissue_id=tissue_ids if use_tissue else None)
+            predictions, _ = self.model(features, 
+                                        attn_mask=attn_mask, 
+                                        tissue_id=tissue_ids if use_tissue else None, 
+                                        sex=sexs if use_tissue else None)
             
             loss = self.train_loss_fn(predictions, ages)
             

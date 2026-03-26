@@ -144,9 +144,12 @@ class TissueCondRegressor(nn.Module):
     then tissue-specific scale and bias are applied.
     This allows different tissues to have different aging rates and baselines.
     """
-    def __init__(self, num_tissues, feature_dim, embed_dim=64):
+    def __init__(self, num_tissues, feature_dim, embed_dim=64, sex_embed=False):
         super().__init__()
         self.tissue_embedding = nn.Embedding(num_tissues, embed_dim)
+        self.sex_embed = sex_embed
+        if sex_embed:
+            self.sex_embedding = nn.Embedding(2, embed_dim)
         
         # Base regressor (tissue-agnostic)
         self.base_regressor = nn.Sequential(
@@ -158,18 +161,27 @@ class TissueCondRegressor(nn.Module):
         )
         
         # Tissue-conditioned scale and bias for the prediction
-        self.cond_generator = nn.Sequential(
-            nn.Linear(embed_dim, 32),
-            nn.GELU(),
-            nn.Linear(32, 2),  # scale and bias
-        )
+        if sex_embed:
+            self.cond_generator = nn.Sequential(
+                nn.Linear(embed_dim*2, 32),
+                nn.GELU(),
+                nn.Linear(32, 2),  # scale and bias
+            )
+        
+        else:
+            self.cond_generator = nn.Sequential(
+                nn.Linear(embed_dim, 32),
+                nn.GELU(),
+                nn.Linear(32, 2),  # scale and bias
+            )
+
         # Initialize so scale ≈ 1 and bias ≈ 0
         nn.init.zeros_(self.cond_generator[2].weight)
         nn.init.constant_(self.cond_generator[2].bias, 0.0)
         with torch.no_grad():
             self.cond_generator[2].bias[0] = 1.0  # scale = 1
     
-    def forward(self, features, tissue_id):
+    def forward(self, features, tissue_id, sex):
         """
         Args:
             features: (batch_size, feature_dim)
@@ -179,7 +191,13 @@ class TissueCondRegressor(nn.Module):
         """
         base_pred = self.base_regressor(features).squeeze(-1)  # (B,)
         
-        emb = self.tissue_embedding(tissue_id)  # (B, embed_dim)
+        if self.sex_embed:
+            emb = self.tissue_embedding(tissue_id)
+            s_emb = self.sex_embedding(sex)
+            emb = torch.cat([emb, s_emb], dim=-1)
+        else:
+            emb = self.tissue_embedding(tissue_id)  # (B, embed_dim)
+        
         cond = self.cond_generator(emb)          # (B, 2)
         scale, bias = cond[:, 0], cond[:, 1]
         
@@ -211,34 +229,30 @@ class TissueABMIL(nn.Module):
 
     def __init__(self, num_tissues, feature_dim=1536, head_dim=256, n_heads=4, gated=True,
                  tissue_cond_mode='none', tissue_cond_embed_dim=64,
-                 # Legacy compatibility
-                 tissue_embed=False):
+                 tissue_embed=False, sex_embed=False):
         super(TissueABMIL, self).__init__()
-        
-        # Legacy compatibility: if tissue_embed=True and tissue_cond_mode='none', use 'concat'
-        if tissue_embed and tissue_cond_mode == 'none':
-            tissue_cond_mode = 'concat'
         
         assert tissue_cond_mode in self.VALID_COND_MODES, \
             f"Invalid tissue_cond_mode '{tissue_cond_mode}'. Must be one of {self.VALID_COND_MODES}"
         
-        self.tissue_cond_mode = tissue_cond_mode
         self.feature_dim = feature_dim
-        
-        # Legacy concat mode
-        self.tissue_embed = (tissue_cond_mode == 'concat')
-        if self.tissue_embed:
+        self.tissue_cond_mode = tissue_cond_mode
+        if tissue_embed and tissue_cond_mode == 'none':
+            tissue_cond_mode = 'concat'
+
+        if tissue_embed and tissue_cond_mode == 'concat':
             self.tissue_embedding = nn.Embedding(num_embeddings=num_tissues, embedding_dim=tissue_cond_embed_dim)
             combined_dim = feature_dim + tissue_cond_embed_dim
         else:
             combined_dim = feature_dim
         
         # New conditioning modules
-        if tissue_cond_mode == 'film':
+        if tissue_embed and tissue_cond_mode == 'film':
             self.tissue_film = TissueFiLM(num_tissues, feature_dim, embed_dim=tissue_cond_embed_dim)
-        elif tissue_cond_mode == 'cond_regressor':
-            self.tissue_cond_regressor = TissueCondRegressor(num_tissues, feature_dim, embed_dim=tissue_cond_embed_dim)
-
+        elif tissue_embed and tissue_cond_mode == 'cond_regressor':
+            self.tissue_cond_regressor = TissueCondRegressor(num_tissues, feature_dim, embed_dim=tissue_cond_embed_dim, sex_embed=sex_embed)
+            self.sex_embed = sex_embed
+            
         # Feature Aggregation
         self.abmil = ABMIL(
             feature_dim=combined_dim, 
@@ -259,7 +273,7 @@ class TissueABMIL(nn.Module):
         )
 
 
-    def forward(self, features, attn_mask=None, tissue_id=None, return_features=False):
+    def forward(self, features, attn_mask=None, tissue_id=None, sex=None, return_features=False):
         """
         features shape: (batch_size, num_images(patches), feature_dim)
         tissue_id shape: (batch_size)
@@ -279,8 +293,11 @@ class TissueABMIL(nn.Module):
         # (batch_size, feature_dim)
         M = aggregated_features.squeeze(1)
         
-        if self.tissue_cond_mode == 'cond_regressor' and tissue_id is not None:
-            Y_pred = self.tissue_cond_regressor(M, tissue_id)
+        if self.tissue_cond_mode == 'cond_regressor':
+            if self.sex_embed:
+                Y_pred = self.tissue_cond_regressor(M, tissue_id, sex)
+            else:
+                Y_pred = self.tissue_cond_regressor(M, tissue_id)
         else:
             Y_pred = self.regressor(M).squeeze(-1)
         
