@@ -47,6 +47,7 @@ class ABMILTrainer:
         
         # Model parameters
         model_params = cfg.get('model_params', {})
+        self.feature_extractor = cfg.get('feature_extractor', 'uni')
         self.feature_dim = model_params.get('feature_dim', 1536)
         self.head_dim = model_params.get('head_dim', 256)
         self.n_heads = model_params.get('n_heads', 4)
@@ -60,6 +61,7 @@ class ABMILTrainer:
         self.use_wandb = cfg.get('use_wandb', True)
         self.wandb_project = cfg.get('wandb_project', 'age-predict-abmil')
         self.wandb_entity = cfg.get('wandb_entity', None)
+        self.wandb_name = cfg.get('wandb_name', "Test")
         self.wandb_run = None
         self.log_step = cfg.get('log_step', 100)
         
@@ -91,7 +93,7 @@ class ABMILTrainer:
                 project=self.wandb_project,
                 entity=self.wandb_entity,
                 config=dict(self.cfg),
-                name=f"{self.cfg.model}_fold{self.fold}_label_{self.tissue_embed}",
+                name=self.wandb_name,
                 dir=str(self.output_dir),
                 reinit=False
             )
@@ -286,7 +288,7 @@ class ABMILTrainer:
             self.accelerator.print("Using Normal Data ONLY!")
             train_loader, val_loader = get_abmil_dataloader_normal(fold=self.fold, batch_size=self.batch_size)
         else:
-            train_loader, val_loader = get_abmil_dataloader(fold=self.fold, batch_size=self.batch_size)
+            train_loader, val_loader = get_abmil_dataloader(fold=self.fold, batch_size=self.batch_size, feature=self.feature_extractor)
         
         # Optimizer
         self.optimizer = AdamW(

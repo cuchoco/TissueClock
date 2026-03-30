@@ -1,7 +1,7 @@
 model: abmil             
-data_dir: /data0/age_predict/preprocessed/coords/features_uni_v2
+data_dir: /data0/age_predict/preprocessed/coords_448/features_conch_v15
 fold: 0
-output_dir: ./experiments/abmil_models_wlabel
+output_dir: ./experiments/abmil_models_cond_sex_conch
 
 # Training parameters
 batch_size: 4
@@ -9,22 +9,26 @@ num_epochs: 20
 learning_rate: 1e-4
 weight_decay: 1e-5
 accumulation_steps: 1
-num_tissues: 40
+num_tissues: 29
 
 # W&B configuration
 use_wandb: true
 wandb_project: age-predict
 wandb_entity: null 
+wandb_name: abmil-cond-sex-conch
 log_step: 100
 
 # Model parameters
+feature_extractor: conch
 model_params:
-  feature_dim: 1536
+  feature_dim: 768
   head_dim: 256
   n_heads: 4
   gated: true
   tissue_embed: true
-  tissue_embed_dim: 16
+  sex_embed: true
+  tissue_cond_mode: cond_regressor
+  tissue_cond_embed_dim: 64
   
 hydra:
   run:

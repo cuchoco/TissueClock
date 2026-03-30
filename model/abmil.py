@@ -161,19 +161,11 @@ class TissueCondRegressor(nn.Module):
         )
         
         # Tissue-conditioned scale and bias for the prediction
-        if sex_embed:
-            self.cond_generator = nn.Sequential(
-                nn.Linear(embed_dim*2, 32),
-                nn.GELU(),
-                nn.Linear(32, 2),  # scale and bias
-            )
-        
-        else:
-            self.cond_generator = nn.Sequential(
-                nn.Linear(embed_dim, 32),
-                nn.GELU(),
-                nn.Linear(32, 2),  # scale and bias
-            )
+        self.cond_generator = nn.Sequential(
+            nn.Linear(embed_dim, 32),
+            nn.GELU(),
+            nn.Linear(32, 2),  # scale and bias
+        )
 
         # Initialize so scale ≈ 1 and bias ≈ 0
         nn.init.zeros_(self.cond_generator[2].weight)
@@ -181,7 +173,7 @@ class TissueCondRegressor(nn.Module):
         with torch.no_grad():
             self.cond_generator[2].bias[0] = 1.0  # scale = 1
     
-    def forward(self, features, tissue_id, sex):
+    def forward(self, features, tissue_id, sex=None):
         """
         Args:
             features: (batch_size, feature_dim)
@@ -190,15 +182,15 @@ class TissueCondRegressor(nn.Module):
             prediction: (batch_size,)
         """
         base_pred = self.base_regressor(features).squeeze(-1)  # (B,)
+        t_emb = self.tissue_embedding(tissue_id)  # (B, embed_dim)
         
-        if self.sex_embed:
-            emb = self.tissue_embedding(tissue_id)
+        if self.sex_embed and sex is not None:
             s_emb = self.sex_embedding(sex)
-            emb = torch.cat([emb, s_emb], dim=-1)
+            combined_emb = t_emb + (t_emb*s_emb)  # Simple way to combine tissue and sex embeddings
         else:
-            emb = self.tissue_embedding(tissue_id)  # (B, embed_dim)
+            combined_emb = t_emb
         
-        cond = self.cond_generator(emb)          # (B, 2)
+        cond = self.cond_generator(combined_emb) # (B, 2)
         scale, bias = cond[:, 0], cond[:, 1]
         
         return scale * base_pred + bias

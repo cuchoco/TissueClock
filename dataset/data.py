@@ -15,13 +15,17 @@ class AgePredictDataset(Dataset):
     Dataset for Age Prediction from Whole Slide Images.
     Loads h5 features and normalizes age.
     """
-    def __init__(self, fold: int = 0, train: bool = True) -> None:
+    def __init__(self, fold: int = 0, train: bool = True, feature = "uni") -> None:
         self.df = pd.read_csv(CSV_PATH)
         if train:
             self.df = self.df[self.df['fold'] != fold]
         else:
             self.df = self.df[self.df['fold'] == fold]
-        self.feature_root = Path(FEATURE_ROOT)
+
+        if feature == "uni":
+            self.feature_root = Path(FEATURE_ROOT)
+        elif feature == "conch":
+            self.feature_root = Path(FEATURE_ROOT_CONCH)
 
     def __len__(self) -> int:
         return len(self.df)
@@ -74,10 +78,10 @@ def mil_collate_fn(batch: List[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]])
     
     return padded_features, labels, tissue_ids, attn_mask, sexs
 
-def get_abmil_dataloader(fold: int = 0, batch_size: int = 1) -> Tuple[DataLoader, DataLoader]:
+def get_abmil_dataloader(fold: int = 0, batch_size: int = 1, feature="uni") -> Tuple[DataLoader, DataLoader]:
     
-    tr_dataset = AgePredictDataset(fold=fold, train=True)
-    val_dataset = AgePredictDataset(fold=fold, train=False)
+    tr_dataset = AgePredictDataset(fold=fold, train=True, feature=feature)
+    val_dataset = AgePredictDataset(fold=fold, train=False, feature=feature)
 
     tr_dataloader = DataLoader(tr_dataset, 
                             batch_size=batch_size, 
