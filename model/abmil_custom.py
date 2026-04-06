@@ -4,7 +4,6 @@ import torch.nn.functional as F
 
 from einops import rearrange
 
-
 class ABMIL(nn.Module):
     """
     Multi-headed attention network with optional gating. Uses tanh-attention and sigmoid-gating as in ABMIL (https://arxiv.org/abs/1802.04712).
@@ -95,140 +94,80 @@ class ABMIL(nn.Module):
 
         return aggregated_features, head_attentions
 
-# ============================================================
-# Tissue Conditioning Modules
-# ============================================================
-
-class TissueFiLM(nn.Module):
-    """
-    Feature-wise Linear Modulation (FiLM) conditioned on tissue type.
-    Generates scale (gamma) and shift (beta) to modulate features without
-    changing the feature dimension.
-    
-    Reference: Perez et al., "FiLM: Visual Reasoning with a General Conditioning Layer", AAAI 2018
-    """
-    def __init__(self, num_tissues, feature_dim, embed_dim=64):
-        super().__init__()
-        self.tissue_embedding = nn.Embedding(num_tissues, embed_dim)
-        self.film_generator = nn.Sequential(
-            nn.Linear(embed_dim, feature_dim * 2),  # generate gamma and beta together
-        )
-        # Initialize gamma close to 1 and beta close to 0
-        nn.init.zeros_(self.film_generator[0].weight)
-        nn.init.zeros_(self.film_generator[0].bias)
-        # Set gamma bias to 1 (first half of output)
-        with torch.no_grad():
-            self.film_generator[0].bias[:feature_dim] = 1.0
-    
-    def forward(self, features, tissue_id):
-        """
-        Args:
-            features: (batch_size, num_patches, feature_dim)
-            tissue_id: (batch_size,)
-        Returns:
-            modulated features: (batch_size, num_patches, feature_dim)
-        """
-        emb = self.tissue_embedding(tissue_id)  # (B, embed_dim)
-        film_params = self.film_generator(emb)   # (B, feature_dim * 2)
-        gamma, beta = film_params.chunk(2, dim=-1)  # each (B, feature_dim)
-        
-        # Broadcast over num_patches: (B, 1, feature_dim)
-        gamma = gamma.unsqueeze(1)
-        beta = beta.unsqueeze(1)
-        
-        return gamma * features + beta
-
-class TissueCondRegressor(nn.Module):
-    """
-    Tissue-conditioned regressor. The base prediction is made from features,
-    then tissue-specific scale and bias are applied.
-    This allows different tissues to have different aging rates and baselines.
-    """
-    def __init__(self, num_tissues, feature_dim, embed_dim=64, sex_embed=False):
+class TissueHypernetwork(nn.Module):
+    def __init__(self, num_tissues, in_features=256, embed_dim=64, sex_embed=False):
         super().__init__()
         self.tissue_embedding = nn.Embedding(num_tissues, embed_dim)
         self.sex_embed = sex_embed
+        
         if sex_embed:
             self.sex_embedding = nn.Embedding(2, 8)
+            input_dim = embed_dim + 8
+        else:
+            input_dim = embed_dim
+            
+        # 생성해야 할 최종 파라미터 개수: Weight(in_features * 1) + Bias(1)
+        self.target_weight_dim = in_features
+        self.target_bias_dim = 1
+        num_target_params = self.target_weight_dim + self.target_bias_dim
         
-        # Base regressor (tissue-agnostic)
-        self.base_regressor = nn.Sequential(
-            nn.Linear(feature_dim, 256),
-            nn.LayerNorm(256),
+        # Hypernetwork MLP
+        self.hyper_net = nn.Sequential(
+            nn.Linear(input_dim, 64),
             nn.GELU(),
-            nn.Dropout(0.25),
-            nn.Linear(256, 1)
+            nn.Linear(64, num_target_params)
         )
         
-        # Tissue-conditioned scale and bias for the prediction
-        if sex_embed:
-            self.cond_generator = nn.Sequential(
-                nn.Linear(embed_dim+8, 32),
-                nn.GELU(),
-                nn.Linear(32, 2),  # scale and bias
-            )
-        else:
-            self.cond_generator = nn.Sequential(
-                nn.Linear(embed_dim, 32),
-                nn.GELU(),
-                nn.Linear(32, 2),  # scale and bias
-            )
+        # 초기화: 생성되는 파라미터의 스케일을 줄여 초기 학습 폭발(Explosion) 방지
+        nn.init.xavier_uniform_(self.hyper_net[-1].weight, gain=0.01)
+        nn.init.zeros_(self.hyper_net[-1].bias)
 
-        # Initialize so scale ≈ 1 and bias ≈ 0
-        nn.init.zeros_(self.cond_generator[2].weight)
-        nn.init.constant_(self.cond_generator[2].bias, 0.0)
-        with torch.no_grad():
-            self.cond_generator[2].bias[0] = 1.0  # scale = 1
-    
     def forward(self, features, tissue_id, sex=None):
         """
         Args:
-            features: (batch_size, feature_dim)
+            features: (batch_size, in_features) - 공통 추출기를 통과한 Bag-level 피처
             tissue_id: (batch_size,)
+            sex: (batch_size,)
         Returns:
             prediction: (batch_size,)
         """
-        base_pred = self.base_regressor(features).squeeze(-1)  # (B,)
-        t_emb = self.tissue_embedding(tissue_id)  # (B, embed_dim)
+        B = features.size(0)
         
+        # 1. Condition Embedding 결합
+        t_emb = self.tissue_embedding(tissue_id) # (B, embed_dim)
         if self.sex_embed and sex is not None:
             s_emb = self.sex_embedding(sex)
-            # combined_emb = t_emb + (t_emb*self.s_emb)  # Simple way to combine tissue and sex embeddings
-            combined_emb = torch.cat((t_emb, s_emb), dim=-1)  # Concatenate tissue and sex embeddings
+            combined_emb = torch.cat((t_emb, s_emb), dim=-1)
         else:
             combined_emb = t_emb
+            
+        # 2. 동적 파라미터 생성
+        dynamic_params = self.hyper_net(combined_emb) # (B, in_features + 1)
         
-        cond = self.cond_generator(combined_emb) # (B, 2)
-        scale, bias = cond[:, 0], cond[:, 1]
+        # Weight와 Bias 분리 (1차원 출력이므로 out_features=1)
+        dynamic_weight = dynamic_params[:, :self.target_weight_dim].view(B, 1, self.target_weight_dim)
+        dynamic_bias = dynamic_params[:, self.target_weight_dim:].view(B, 1)
         
-        return scale * base_pred + bias
+        # 3. 예측 연산 (y = z * W^T + b)
+        features_expanded = features.unsqueeze(1) # (B, 1, in_features)
+        weight_transposed = dynamic_weight.transpose(1, 2) # (B, in_features, 1)
+        
+        y_pred = torch.bmm(features_expanded, weight_transposed).squeeze(1) # (B, 1)
+        y_pred = y_pred + dynamic_bias # (B, 1)
+        
+        return y_pred.squeeze(-1) # (B,)
 
 
 # ============================================================
-# Main Model
+# Main Model (수정됨)
 # ============================================================
 
 class TissueABMIL(nn.Module):
-    """
-    ABMIL model with flexible tissue conditioning strategies.
-    
-    Args:
-        num_tissues: Number of tissue types
-        feature_dim: Input feature dimension (default: 1536 for UNI v2)
-        head_dim: Attention head hidden dimension
-        n_heads: Number of attention heads
-        gated: Whether to use gated attention
-        tissue_cond_mode: Tissue conditioning strategy. One of:
-            - 'none': No tissue conditioning
-            - 'concat': Original concatenation approach (legacy)
-            - 'film': FiLM conditioning on features (recommended)
-            - 'cond_regressor': Tissue-conditioned prediction head
-        tissue_cond_embed_dim: Dimension of tissue embedding (for new conditioning modes)
-    """
-    VALID_COND_MODES = ('none', 'concat', 'film', 'cond_regressor')
+    # hypernetwork 모드 추가
+    VALID_COND_MODES = ('none', 'concat', 'film', 'cond_regressor', 'hypernetwork')
 
     def __init__(self, num_tissues, feature_dim=1536, head_dim=256, n_heads=4, gated=True,
-                 tissue_cond_mode='none', tissue_cond_embed_dim=64,
+                 tissue_cond_mode='hypernetwork', tissue_cond_embed_dim=64,
                  tissue_embed=False, sex_embed=False):
         super(TissueABMIL, self).__init__()
         
@@ -237,6 +176,8 @@ class TissueABMIL(nn.Module):
         
         self.feature_dim = feature_dim
         self.tissue_cond_mode = tissue_cond_mode
+        self.sex_embed = sex_embed
+        
         if tissue_embed and tissue_cond_mode == 'none':
             tissue_cond_mode = 'concat'
 
@@ -247,11 +188,14 @@ class TissueABMIL(nn.Module):
             combined_dim = feature_dim
         
         # New conditioning modules
-        if tissue_embed and tissue_cond_mode == 'film':
-            self.tissue_film = TissueFiLM(num_tissues, feature_dim, embed_dim=tissue_cond_embed_dim)
-        elif tissue_embed and tissue_cond_mode == 'cond_regressor':
-            self.tissue_cond_regressor = TissueCondRegressor(num_tissues, feature_dim, embed_dim=tissue_cond_embed_dim, sex_embed=sex_embed)
-            self.sex_embed = sex_embed
+        self.tissue_hypernetwork = TissueHypernetwork(num_tissues, in_features=256, embed_dim=tissue_cond_embed_dim, sex_embed=sex_embed)
+
+        self.shared_feature_extractor = nn.Sequential(
+            nn.Linear(combined_dim, 256),
+            nn.LayerNorm(256),
+            nn.GELU(),
+            nn.Dropout(0.25)
+        )
             
         # Feature Aggregation
         self.abmil = ABMIL(
@@ -263,7 +207,7 @@ class TissueABMIL(nn.Module):
             gated=gated
         )
         
-        # Regressor (used as fallback when tissue_id=None in cond_regressor mode)
+        # Regressor (used as fallback or for standard modes)
         self.regressor = nn.Sequential(
             nn.Linear(combined_dim, 256),
             nn.LayerNorm(256),
@@ -274,30 +218,16 @@ class TissueABMIL(nn.Module):
 
 
     def forward(self, features, attn_mask=None, tissue_id=None, sex=None, return_features=False):
-        """
-        features shape: (batch_size, num_images(patches), feature_dim)
-        tissue_id shape: (batch_size)
-        """
 
-        # Apply tissue conditioning
-        if self.tissue_cond_mode == 'concat' and tissue_id is not None:
-            T_emb = self.tissue_embedding(tissue_id)
-            T_emb = T_emb.unsqueeze(1).expand(-1, features.size(1), -1)
-            features = torch.cat((features, T_emb), dim=-1)
-        elif self.tissue_cond_mode == 'film' and tissue_id is not None:
-            features = self.tissue_film(features, tissue_id)
-
+        # Attention MIL Pooling
         aggregated_features, head_attentions = self.abmil(features, attn_mask)
+        M = aggregated_features.squeeze(1) # (batch_size, feature_dim)
         
-        # aggregated_features shape: (batch_size, n_branches, feature_dim)
-        # (batch_size, feature_dim)
-        M = aggregated_features.squeeze(1)
-        
-        if self.tissue_cond_mode == 'cond_regressor':
-            if self.sex_embed:
-                Y_pred = self.tissue_cond_regressor(M, tissue_id, sex)
-            else:
-                Y_pred = self.tissue_cond_regressor(M, tissue_id)
+        # Prediction
+        if self.tissue_cond_mode == 'hypernetwork' and tissue_id is not None:
+            shared_features = self.shared_feature_extractor(M) 
+            Y_pred = self.tissue_hypernetwork(shared_features, tissue_id, sex if self.sex_embed else None)
+            
         else:
             Y_pred = self.regressor(M).squeeze(-1)
         

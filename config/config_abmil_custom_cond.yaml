@@ -1,7 +1,7 @@
-model: abmil             
+model: abmil_custom      
 data_dir: /data0/age_predict/preprocessed/coords/features_uni_v2
 fold: 0
-output_dir: ./experiments/abmil_models_cond_final
+output_dir: ./experiments/abmil_custom_cond
 
 # Training parameters
 batch_size: 4
@@ -15,7 +15,7 @@ num_tissues: 29
 use_wandb: true
 wandb_project: age-predict
 wandb_entity: null 
-wandb_name: abmil-cond-uni
+wandb_name: abmil-custom-cond-uni
 log_step: 100
 
 # Model parameters
@@ -27,7 +27,7 @@ model_params:
   gated: true
   tissue_embed: true
   sex_embed: false
-  tissue_cond_mode: cond_regressor
+  tissue_cond_mode: hypernetwork
   tissue_cond_embed_dim: 64
   
 hydra:
